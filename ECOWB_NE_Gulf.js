@@ -7,6 +7,13 @@
 //Set NE study Area
 var NorthGulf = ee.FeatureCollection("users/joshsumers1996/North_Gulf");
 
+//set start Date
+var Start = '2018-01-01';
+
+//set End Date
+
+var End = '2018-12-31';
+
 // import sentinel imagery
 var Sent1 = ee.ImageCollection('COPERNICUS/S1_GRD');
 
@@ -19,7 +26,7 @@ var vvvh = Sent1
 // set to IW mode
  .filter(ee.Filter.eq('instrumentMode', 'IW'))
  //Date
- .filter(ee.Filter.date('2018-01-01','2018-12-31'))
+ .filter(ee.Filter.date(Start,End))
  //filter North
  .filterBounds(NorthGulf)
  //Clip North
