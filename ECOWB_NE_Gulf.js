@@ -44,10 +44,11 @@ var visParm = {Bands: 'VV,VH', min: -30, max: 5};
  Map.centerObject(NorthGulf, 11);
  Map.style().set('cursor', 'crosshair');
 
-
+// create inspector
  var inspector = ui.Panel([ui.Label('Click to get VV / VH Values')]);
  Map.add(inspector);
 
+//get vv & VH values on click
 var Click = Map.onClick(function(coords) {
   var Inspectionpoint = ee.Geometry.Point(coords.lon, coords.lat);
   //var PointValue = Inspectionpoint.select('VV');
