@@ -2,7 +2,7 @@
 //// NorthEast Gulf Draft Script ////
 //// By: Joshua Sumers ////
 //// Start Date: 06-25-2019 ////
-//// Update Date: 07-11-2019 ////
+//// Update Date: 07-29-2019 ////
 
 //Set NE study Area
 var NorthGulf = ee.FeatureCollection("users/joshsumers1996/North_Gulf");
@@ -35,40 +35,59 @@ var vvvh = Sent1
  //Clip North
  .map(function(image){return image.clip(NorthGulf)});
 
-var SImage = vvvh.median().select('VV','VH');
+//Create a band to serve as a Hycanith Determination based on VH value greater than -22
+var HycDet = function(image){
+  var VH = image.select(['VH']);
+  return image.addBands(ee.Image(1).updateMask(VH.gte(-22)).rename('Hycanith'));
+};
+
+//Create a Band to serve as a Water determination based on VH value less than -22
+var WaterDet = function(image){
+  var VH = image.select(['VH']);
+  return image.addBands(ee.Image(1).updateMask(VH.lte(-22)).rename('Water'));
+};
+
+//create variable that has both bands
+var HycanithDeter = vvvh.map(HycDet).map(WaterDet);
+
+//print out values
+print(HycanithDeter);
+
+//create image of Hycanith based on median VH values
+var Hycanith = HycanithDeter.select('Hycanith').median();
+
+//create image of water based on median VH values
+var Water = HycanithDeter.select('Water').median();
+
+//standard image using VV and VH values
+var SImage = vvvh.select('VV','VH').median();
+
 //set visualization parameters
 var visParm = {Bands: 'VV,VH', min: -30, max: 5};
 
+//visualation parameters for water/hycanith determination
+var visParms = {Bands: 'VHH', min: 0, max: 1};
+
+ //Map.addLayer(testingm, visParms, 'test');
+ Map.addLayer(Hycanith, visParms, 'Hycanith');
+ Map.addLayer(Water, visParms, 'Water');
  Map.addLayer(vvvh, visParm, 'North');
  Map.addLayer(SImage, visParm, 'Median image');
  Map.centerObject(NorthGulf, 11);
  Map.style().set('cursor', 'crosshair');
 
-// create inspector
- var inspector = ui.Panel([ui.Label('Click to get VV / VH Values')]);
- Map.add(inspector);
-
-//get vv & VH values on click
-var Click = Map.onClick(function(coords) {
-  var Inspectionpoint = ee.Geometry.Point(coords.lon, coords.lat);
-  //var PointValue = Inspectionpoint.select('VV');
-  var sample = SImage.sample(Inspectionpoint,10);
-  inspector.widgets().set(0, ui.Label({
-    value: 'VV/VH' + sample,
-    style: {color: 'gray'}
-  }))});
-
 //Do you want to export an image?
-var IExport = false;
+var IExport = true;
 
 //export image
 if (IExport === true){
   Export.image.toDrive({
-    image: SImage,
+    image: Hycanith,
     description: "WaterHycanith",
-    maxPixels: 1e10,
+    maxPixels: 1e13,
     crs: "EPSG:3857",
     scale: 10,
+    region: NorthGulf,
     fileFormat: 'GeoTIFF',
   })
 }
