@@ -8,17 +8,14 @@
 var NorthGulf = ee.FeatureCollection("users/joshsumers1996/North_Gulf");
 
 //set start Date
-var Start = '2017-05-06';
+var Start = ee.Date('2017-01-01');
 
 //set End Date
 
-var End = '2017-05-08';
-
-//imagery date for test
-//var TDate = '2017-05-07';
+var End = ee.Date('2017-12-31');
 
 // import sentinel imagery
-
+var Sent1 = ee.ImageCollection("COPERNICUS/S1_GRD");
 
 //filter sentinel imagery to include vv+vh
 var vvvh = Sent1
@@ -35,29 +32,51 @@ var vvvh = Sent1
  //Clip North
  .map(function(image){return image.clip(NorthGulf)});
 
-//Create a band to serve as a Hycanith Determination based on VH value greater than -22
+ // Difference in days between start and finish
+ var diff = End.difference(Start, 'day');
+
+ // Make a list of all dates
+ var range = ee.List.sequence(0, diff.subtract(1)).map(function(day){return Start.advance(day,'day')})
+
+ // Funtion for iteraton over the range of dates
+ var day_mosaics = function(date, newlist) {
+   // Cast
+   date = ee.Date(date)
+   newlist = ee.List(newlist)
+   // Filter collection between date and the next day
+     var filtered = vvvh.filterDate(date, date.advance(1,'day'))
+
+ // Make the mosaic
+ var image = ee.Image(filtered.mosaic())
+
+ // Add the mosaic to a list only if the collection has images
+return ee.List(ee.Algorithms.If(filtered.size(), newlist.add(image), newlist))
+ }
+
+// Iterate over the range to make a new list, and then cast the list to an imagecollection
+var newcol = ee.ImageCollection(ee.List(range.iterate(day_mosaics, ee.List([]))))
+
+//Create a band to serve as a Hycanith Determination based on VH value greater than -23
 var HycDet = function(image){
   var VH = image.select(['VH']);
-  return image.addBands(ee.Image(1).updateMask(VH.gte(-22)).rename('Hycanith'));
+  return image.addBands(ee.Image(1).updateMask(VH.gte(-23)).rename('Hycanith'));
 };
 
-//Create a Band to serve as a Water determination based on VH value less than -22
-var WaterDet = function(image){
-  var VH = image.select(['VH']);
-  return image.addBands(ee.Image(1).updateMask(VH.lte(-22)).rename('Water'));
-};
 
 //create variable that has both bands
-var HycanithDeter = vvvh.map(HycDet).map(WaterDet);
+var HycanithDeter = vvvh.map(HycDet);
 
 //print out values
 print(HycanithDeter);
+var Hyc = HycanithDeter.select('Hycanith');
+
+var finalcol = ee.ImageCollection(Hyc);
+
+//print final collection images
+print('Final Collection', finalcol);
 
 //create image of Hycanith based on median VH values
 var Hycanith = HycanithDeter.select('Hycanith').median();
-
-//create image of water based on median VH values
-var Water = HycanithDeter.select('Water').median();
 
 //standard image using VV and VH values
 var SImage = vvvh.select('VV','VH').median();
@@ -66,20 +85,20 @@ var SImage = vvvh.select('VV','VH').median();
 var visParm = {Bands: 'VV,VH', min: -30, max: 5};
 
 //visualation parameters for water/hycanith determination
-var visParms = {Bands: 'VHH', min: 0, max: 1};
+var visParms = {Bands: 'VHH', min: -23, max: 1};
 
  //Map.addLayer(testingm, visParms, 'test');
+ Map.addLayer(finalcol, visParms, 'collection');
  Map.addLayer(Hycanith, visParms, 'Hycanith');
- Map.addLayer(Water, visParms, 'Water');
  Map.addLayer(vvvh, visParm, 'North');
  Map.addLayer(SImage, visParm, 'Median image');
  Map.centerObject(NorthGulf, 11);
  Map.style().set('cursor', 'crosshair');
 
-//Do you want to export an image?
-var IExport = true;
+//Do you want to export an individual image?
+var IExport = false;
 
-//export image
+//export indvidual image
 if (IExport === true){
   Export.image.toDrive({
     image: Hycanith,
@@ -98,9 +117,22 @@ var VExport = false;
 //export video
 if (VExport === true) {
 Export.video.toDrive({
-    collection: Video,
+    collection: finalcol,
     description: "VideoOfWaterHy" ,
     scale: 30,
     framesPerSecond: 10,
     region: NorthGulf
 })}
+
+var batch = require('users/fitoprincipe/geetools:batch');
+
+
+//Export image collection?
+var ICExport = false;
+
+if (ICExport === true) {
+  batch.Download.ImageCollection.toDrive(finalcol, 'WCTEST',
+                {scale: 10,
+                 region: NorthGulf,
+                 type: 'float'})
+}
