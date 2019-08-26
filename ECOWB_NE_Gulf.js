@@ -8,11 +8,11 @@
 var NorthGulf = ee.FeatureCollection("users/joshsumers1996/North_Gulf");
 
 //set start Date
-var Start = ee.Date('2017-01-01');
+var Start = ee.Date('2016-08-01');
 
 //set End Date
 
-var End = ee.Date('2017-12-31');
+var End = ee.Date('2019-08-01');
 
 // import sentinel imagery
 var Sent1 = ee.ImageCollection("COPERNICUS/S1_GRD");
@@ -63,17 +63,22 @@ var HycDet = function(image){
 };
 
 
-//create variable that has both bands
+//create variable that has hycanith band
 var HycanithDeter = vvvh.map(HycDet);
 
-//print out values
-print(HycanithDeter);
+//select hycanith band
 var Hyc = HycanithDeter.select('Hycanith');
 
+//create image collection
 var finalcol = ee.ImageCollection(Hyc);
 
 //print final collection images
 print('Final Collection', finalcol);
+
+var hycdet = finalcol.sum().divide(252);
+
+
+print('hycdet', hycdet);
 
 //create image of Hycanith based on median VH values
 var Hycanith = HycanithDeter.select('Hycanith').median();
@@ -82,26 +87,24 @@ var Hycanith = HycanithDeter.select('Hycanith').median();
 var SImage = vvvh.select('VV','VH').median();
 
 //set visualization parameters
-var visParm = {Bands: 'VV,VH', min: -30, max: 5};
+var visParm = {Bands: 'VV,VH', min: 0, max: 300};
 
 //visualation parameters for water/hycanith determination
 var visParms = {Bands: 'VHH', min: -23, max: 1};
 
  //Map.addLayer(testingm, visParms, 'test');
+ Map.addLayer(hycdet, visParm, 'Distribution')
  Map.addLayer(finalcol, visParms, 'collection');
- Map.addLayer(Hycanith, visParms, 'Hycanith');
- Map.addLayer(vvvh, visParm, 'North');
- Map.addLayer(SImage, visParm, 'Median image');
  Map.centerObject(NorthGulf, 11);
  Map.style().set('cursor', 'crosshair');
 
 //Do you want to export an individual image?
-var IExport = false;
+var IExport = true;
 
 //export indvidual image
 if (IExport === true){
   Export.image.toDrive({
-    image: Hycanith,
+    image: hycdet,
     description: "WaterHycanith",
     maxPixels: 1e13,
     crs: "EPSG:3857",
@@ -109,30 +112,4 @@ if (IExport === true){
     region: NorthGulf,
     fileFormat: 'GeoTIFF',
   })
-}
-
-//Do you want to export video?
-var VExport = false;
-
-//export video
-if (VExport === true) {
-Export.video.toDrive({
-    collection: finalcol,
-    description: "VideoOfWaterHy" ,
-    scale: 30,
-    framesPerSecond: 10,
-    region: NorthGulf
-})}
-
-var batch = require('users/fitoprincipe/geetools:batch');
-
-
-//Export image collection?
-var ICExport = false;
-
-if (ICExport === true) {
-  batch.Download.ImageCollection.toDrive(finalcol, 'WCTEST',
-                {scale: 10,
-                 region: NorthGulf,
-                 type: 'float'})
 }
