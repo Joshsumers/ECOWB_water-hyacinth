@@ -2,7 +2,7 @@
 //// NorthEast Gulf Draft Script ////
 //// By: Joshua Sumers ////
 //// Start Date: 06-25-2019 ////
-//// Update Date: 07-29-2019 ////
+//// Update Date: 09-03-2019 ////
 
 //Set NE study Area
 var NorthGulf = ee.FeatureCollection("users/joshsumers1996/North_Gulf");
@@ -13,6 +13,9 @@ var Start = ee.Date('2016-08-01');
 //set End Date
 
 var End = ee.Date('2019-08-01');
+
+//set VH value for analysis
+var VHV = -23;
 
 // import sentinel imagery
 var Sent1 = ee.ImageCollection("COPERNICUS/S1_GRD");
@@ -59,7 +62,7 @@ var newcol = ee.ImageCollection(ee.List(range.iterate(day_mosaics, ee.List([])))
 //Create a band to serve as a Hycanith Determination based on VH value greater than -23
 var HycDet = function(image){
   var VH = image.select(['VH']);
-  return image.addBands(ee.Image(1).updateMask(VH.gte(-23)).rename('Hycanith'));
+  return image.addBands(ee.Image(1).updateMask(VH.gte(VHV)).rename('Hycanith'));
 };
 
 
@@ -72,40 +75,31 @@ var Hyc = HycanithDeter.select('Hycanith');
 //create image collection
 var finalcol = ee.ImageCollection(Hyc);
 
-//print final collection images
-print('Final Collection', finalcol);
+//create count of images
+var imagecount = finalcol.size();
 
-var hycdet = finalcol.sum().divide(252);
+//print number of images in collection
+print('Number of images in collection', imagecount);
 
+//create frequency image in percentage
+var hycdet = finalcol.sum().divide(finalcol.size()).multiply(100);
 
-print('hycdet', hycdet);
-
-//create image of Hycanith based on median VH values
-var Hycanith = HycanithDeter.select('Hycanith').median();
-
-//standard image using VV and VH values
-var SImage = vvvh.select('VV','VH').median();
 
 //set visualization parameters
-var visParm = {Bands: 'VV,VH', min: 0, max: 300};
-
-//visualation parameters for water/hycanith determination
-var visParms = {Bands: 'VHH', min: -23, max: 1};
+var visParm = {Bands: 'hycanith', min: 0, max: 100};
 
  //Map.addLayer(testingm, visParms, 'test');
  Map.addLayer(hycdet, visParm, 'Distribution')
- Map.addLayer(finalcol, visParms, 'collection');
  Map.centerObject(NorthGulf, 11);
- Map.style().set('cursor', 'crosshair');
 
-//Do you want to export an individual image?
+//Do you want to export the frequency image?
 var IExport = true;
 
-//export indvidual image
+//export frequency image
 if (IExport === true){
   Export.image.toDrive({
     image: hycdet,
-    description: "WaterHycanith",
+    description: "Water Hycanith Frequency Image",
     maxPixels: 1e13,
     crs: "EPSG:3857",
     scale: 10,
