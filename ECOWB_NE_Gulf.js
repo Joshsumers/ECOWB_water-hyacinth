@@ -35,30 +35,6 @@ var vvvh = Sent1
  //Clip North
  .map(function(image){return image.clip(NorthGulf)});
 
- // Difference in days between start and finish
- var diff = End.difference(Start, 'day');
-
- // Make a list of all dates
- var range = ee.List.sequence(0, diff.subtract(1)).map(function(day){return Start.advance(day,'day')})
-
- // Funtion for iteraton over the range of dates
- var day_mosaics = function(date, newlist) {
-   // Cast
-   date = ee.Date(date)
-   newlist = ee.List(newlist)
-   // Filter collection between date and the next day
-     var filtered = vvvh.filterDate(date, date.advance(1,'day'))
-
- // Make the mosaic
- var image = ee.Image(filtered.mosaic())
-
- // Add the mosaic to a list only if the collection has images
-return ee.List(ee.Algorithms.If(filtered.size(), newlist.add(image), newlist))
- }
-
-// Iterate over the range to make a new list, and then cast the list to an imagecollection
-var newcol = ee.ImageCollection(ee.List(range.iterate(day_mosaics, ee.List([]))))
-
 //Create a band to serve as a Hycanith Determination based on VH value greater than -23
 var HycDet = function(image){
   var VH = image.select(['VH']);
@@ -71,8 +47,8 @@ var HycanithDeter = vvvh.map(HycDet);
 
 //select hycanith band
 var Hyc = HycanithDeter.select('Hycanith');
-
 //create image collection
+
 var finalcol = ee.ImageCollection(Hyc);
 
 //create count of images
