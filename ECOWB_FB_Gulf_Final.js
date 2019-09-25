@@ -1,11 +1,11 @@
 //// ECO-WB Water Hycanith Project ////
-//// NorthEast Gulf Draft Script ////
+//// Full Gulf Final Script ////
 //// By: Joshua Sumers ////
 //// Start Date: 06-25-2019 ////
-//// Update Date: 09-03-2019 ////
+//// Update Date: 09-12-2019 ////
 
 //Set NE study Area
-var NorthGulf = ee.FeatureCollection("users/joshsumers1996/North_Gulf");
+var FullGulf = ee.FeatureCollection("users/joshsumers1996/FullBound");
 
 //set start Date
 var Start = ee.Date('2016-08-01');
@@ -30,10 +30,10 @@ var vvvh = Sent1
  .filter(ee.Filter.eq('instrumentMode', 'IW'))
  //Date
  .filter(ee.Filter.date(Start, End))
- //filter North
- .filterBounds(NorthGulf)
- //Clip North
- .map(function(image){return image.clip(NorthGulf)});
+ //filter Gulf Boundary
+ .filterBounds(FullGulf)
+ //Clip Gulf Boundary
+ .map(function(image){return image.clip(FullGulf)});
 
 //Create a band to serve as a Hycanith Determination based on VH value greater than -23
 var HycDet = function(image){
@@ -41,32 +41,50 @@ var HycDet = function(image){
   return image.addBands(ee.Image(1).updateMask(VH.gte(VHV)).rename('Hycanith'));
 };
 
+var IC = function(image){
+  var ICV = 1
+  return image.addBands(ee.Image(1).updateMask(ICV).rename('imagecount'));
+};
 
-//create variable that has hycanith band
+//create variable that has hycanith band and image count
 var HycanithDeter = vvvh.map(HycDet);
+var Imagecounting = HycanithDeter.map(IC);
 
 //select hycanith band
-var Hyc = HycanithDeter.select('Hycanith');
-//create image collection
+var Hyc = Imagecounting.select('Hycanith');
 
-var finalcol = ee.ImageCollection(Hyc);
+//Select image number band
+var ICv = Imagecounting.select('imagecount');
+
+//create image collections
+var finalcolHyc = ee.ImageCollection(Hyc);
+var finalcolIC = ee.ImageCollection(ICv);
 
 //create count of images
-var imagecount = finalcol.size();
+var totalimagecount = finalcolHyc.size();
 
 //print number of images in collection
-print('Number of images in collection', imagecount);
+print('Number of images in collection', totalimagecount);
 
-//create frequency image in percentage
-var hycdet = finalcol.sum().divide(finalcol.size()).multiply(100);
+//create sum presence of hycanith
+var hycdet = finalcolHyc.sum();
+
+//create sum of imagecounts
+var ICV = finalcolIC.sum();
+
+//create frequency
+var FQI = hycdet.divide(ICV);
+
+//convert to percent coverage
+var PI = FQI.multiply(100);
 
 
 //set visualization parameters
 var visParm = {Bands: 'hycanith', min: 0, max: 100};
 
  //Map.addLayer(testingm, visParms, 'test');
- Map.addLayer(hycdet, visParm, 'Distribution')
- Map.centerObject(NorthGulf, 11);
+ Map.addLayer(PI, visParm, 'Distribution')
+ Map.centerObject(FullGulf, 11);
 
 //Do you want to export the frequency image?
 var IExport = true;
@@ -74,12 +92,12 @@ var IExport = true;
 //export frequency image
 if (IExport === true){
   Export.image.toDrive({
-    image: hycdet,
+    image: PI,
     description: "Water Hycanith Frequency Image",
     maxPixels: 1e13,
     crs: "EPSG:3857",
     scale: 10,
-    region: NorthGulf,
+    region: FullGulf,
     fileFormat: 'GeoTIFF',
   })
 }
